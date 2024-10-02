@@ -10,6 +10,7 @@ def manejar_inicio():
     """
     Función para manejar el inicio del asistente de WhatsApp.
     """
+    global ejecutando
     if not ejecutando:
         print("Se presionó Ctrl+i. Iniciando asistente de WhatsApp.")
         threading.Thread(target=iniciar_whatsapp).start()

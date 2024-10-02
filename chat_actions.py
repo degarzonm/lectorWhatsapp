@@ -1,29 +1,53 @@
+# Contenido del archivo: chat_actions.py
 import re
-from database import chatsql
+import time
+from database import (chatsql, guardar_mensaje, mensaje_ya_procesado,
+                      generar_nuevo_message_id)
 
-
-def extraer_chat(texto_extraido):
+def extraer_ultimo_mensaje_usuario(texto_extraido):
     """
-    Extrae el último bloque de chat que no tiene respuesta de nuestro sistema.
+    Extracts the last unprocessed user message, including multi-line messages.
+    It identifies new messages based on the first 20 characters and the time elapsed.
+    Only the text after the 'Chat' prefix is considered.
     """
-    # Buscar todas las ocurrencias de "Chat:" y posibles respuestas "Respuesta:"
-    bloques_chat = re.findall(r'Chat(.*?)(?=Chat|$)', texto_extraido, re.DOTALL)
-    bloques_respuesta = re.findall(r'<Respuesta>', texto_extraido)
-    print("Bloques de chat:\n", bloques_chat)
-    print("Bloques de respuesta:\n", bloques_respuesta)
-    
-    
-    # Si hay bloques de chat pero menos respuestas, se considera el último bloque sin respuesta
-    if len(bloques_chat) > len(bloques_respuesta):
-        print("Bloque de chat sin respuesta:\n", bloques_chat[-1])
-        return "<Chat>" + bloques_chat[-1].strip() + "</Chat>"
-    return None
+    lines = texto_extraido.strip().splitlines()
+    mensaje_usuario = ''
+    collected_lines = []
 
+    # Start from the end and find the last 'Chat' line
+    for idx in range(len(lines) - 1, -1, -1):
+        line = lines[idx].strip()
+        if not line:
+            continue
+        if line.startswith('Chat'):
+            # Found the last 'Chat', start collecting
+            # Remove 'Chat' prefix and collect the line
+            collected_lines.append(line[len('Chat'):].strip())
+            # Now collect any following lines until we hit 'Respuesta' or 'Chat'
+            for j in range(idx + 1, len(lines)):
+                next_line = lines[j].strip()
+                if next_line.startswith('Respuesta') or next_line.startswith('Chat'):
+                    break
+                collected_lines.append(next_line)
+            break  # We have collected the last message
+    if collected_lines:
+        mensaje_usuario = '\n'.join(collected_lines)
+        mensaje_preview = mensaje_usuario[:20]
+        timestamp_actual = time.time()
+        if not mensaje_ya_procesado(mensaje_preview, timestamp_actual):
+            # Generate a new message_id
+            message_id = generar_nuevo_message_id()
+            guardar_mensaje(message_id, timestamp_actual, mensaje_usuario, 'user')
+            return message_id, mensaje_usuario
+        else:
+            print("El mensaje ya ha sido procesado recientemente.")
+    else:
+        print("No se encontró un nuevo mensaje del usuario.")
+    return None, None
 
-
-def ejecutar_acciones(chat_string):
+def ejecutar_acciones(respuesta):
     """Extrae y ejecuta las acciones dentro de la etiqueta <Acciones>."""
-    acciones = re.findall(r'<Acciones>(.*?)</Acciones>', chat_string, re.DOTALL)
+    acciones = re.findall(r'<Acciones>(.*?)</Acciones>', respuesta, re.DOTALL)
     resultados = ""
     for accion in acciones:
         accion = accion.strip()
@@ -34,4 +58,3 @@ def ejecutar_acciones(chat_string):
             resultado = chatsql(sql_statement)
             resultados += f"<Resultado>{resultado}</Resultado>\n"
     return resultados
-

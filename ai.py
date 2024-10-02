@@ -49,11 +49,14 @@ def generar_respuesta(ultimo_chat):
         "content": ultimo_chat,
     }
 ]
-    
-    # Generar la respuesta usando el modelo de OpenAI
-    chat_completion = client.chat.completions.create(
+        # Generar la respuesta usando el modelo de OpenAI
+    try:
+        chat_completion = client.chat.completions.create(
         messages=prompt,
         model="gpt-4-turbo",
-    )
-    
-    return chat_completion.choices[0].message.content
+        )   
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"Error al generar la respuesta: {e}")
+        return "<Respuesta> Lo siento, ha ocurrido un error al procesar tu solicitud. </Respuesta>"
+ 
